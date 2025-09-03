@@ -3,22 +3,26 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    const mod = b.addModule("zig_text_editor", .{
-        .root_source_file = b.path("src/root.zig"),
+
+    const app_mod = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
+        .optimize = optimize,
+        .link_libc = false,
     });
+
+    const sdl_dep = b.dependency("sdl", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const sdl_lib = sdl_dep.artifact("SDL3");
+    app_mod.linkLibrary(sdl_lib);
 
     const exe = b.addExecutable(.{
         .name = "zig_text_editor",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "zig_text_editor", .module = mod },
-            },
-        }),
+        .root_module = app_mod,
     });
+    exe.lto = null;
 
     b.installArtifact(exe);
 
@@ -33,12 +37,6 @@ pub fn build(b: *std.Build) void {
         run_cmd.addArgs(args);
     }
 
-    const mod_tests = b.addTest(.{
-        .root_module = mod,
-    });
-
-    const run_mod_tests = b.addRunArtifact(mod_tests);
-
     const exe_tests = b.addTest(.{
         .root_module = exe.root_module,
     });
@@ -46,6 +44,5 @@ pub fn build(b: *std.Build) void {
     const run_exe_tests = b.addRunArtifact(exe_tests);
 
     const test_step = b.step("test", "Run tests");
-    test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
 }
